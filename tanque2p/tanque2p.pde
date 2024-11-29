@@ -8,10 +8,12 @@ boolean segundoJugador;
 boolean juegoTerminado;
 boolean poderActivo;
 int puntuacion;
+int puntuacionMaxima;
 int vidas;
 int[] obstaculoX;
 int[] obstaculoY;
 int[] obstaculoEspecial; // Array para indicar si el obstáculo es especial
+int[] obstaculoDesventaja; // Array para indicar si el obstáculo es de desventaja
 int maxObstaculos = 10;
 int[] balaX;
 int[] balaY;
@@ -20,6 +22,9 @@ int[] bala2Y;
 int maxBalas = 30;
 ArrayList<Explosion> explosiones; // Lista de explosiones
 ArrayList<Colision> colisiones; // Lista de colisiones
+boolean mostrarTitulo = true;
+float escalaTitulo = 1.0;
+int alfaTitulo = 255;
 
 void setup() {
   size(800, 600);
@@ -28,6 +33,7 @@ void setup() {
   obstaculoX = new int[maxObstaculos];
   obstaculoY = new int[maxObstaculos];
   obstaculoEspecial = new int[maxObstaculos]; // Inicializar array de obstáculos especiales
+  obstaculoDesventaja = new int[maxObstaculos]; // Inicializar array de obstáculos de desventaja
   balaX = new int[maxBalas];
   balaY = new int[maxBalas];
   bala2X = new int[maxBalas];
@@ -35,81 +41,99 @@ void setup() {
   explosiones = new ArrayList<Explosion>(); // Inicializar lista de explosiones
   colisiones = new ArrayList<Colision>(); // Inicializar lista de colisiones
   puntuacion = 0;
+  puntuacionMaxima = 0;
   vidas = 5;
 }
 
 void draw() {
   background(0);
-  if (miPuerto.available() > 0) {
-    String val = miPuerto.readStringUntil('\n');
-    if (val != null) {
-      val = val.trim();
-      if (val.startsWith("NAVES")) {
-        String[] datos = val.split(" \\| ");
-        if (datos.length == 4) {
-          String[] datosNave = datos[0].split(" ");
-          if (datosNave.length >= 8) {
-            naveX = int(datosNave[1]);
-            nave2X = int(datosNave[2]);
-            segundoJugador = datosNave[3].equals("1");
-            juegoTerminado = datosNave[4].equals("1");
-            puntuacion = int(datosNave[5]);
-            vidas = int(datosNave[6]);
-            poderActivo = datosNave[7].equals("1");
-          }
+  if (mostrarTitulo) {
+    // Mostrar título con efecto de zoom y cambio de color
+    fill(255, 255, 0, alfaTitulo);
+    textAlign(CENTER, CENTER);
+    textSize(48 * escalaTitulo);
+    text("Astros Circles", width / 2, height / 2);
+    
+    // Efecto de zoom y desvanecimiento
+    escalaTitulo += 0.02;
+    alfaTitulo -= 2;
+    if (alfaTitulo <= 0) {
+      mostrarTitulo = false;
+    }
+} else {
+if (miPuerto.available() > 0) {
+  String val = miPuerto.readStringUntil('\n');
+  if (val != null) {
+    val = val.trim();
+    if (val.startsWith("NAVES")) {
+      String[] datos = val.split(" \\| ");
+      if (datos.length == 4) {
+        String[] datosNave = datos[0].split(" ");
+        if (datosNave.length >= 9) {
+          naveX = int(datosNave[1]);
+          nave2X = int(datosNave[2]);
+          segundoJugador = datosNave[3].equals("1");
+          juegoTerminado = datosNave[4].equals("1");
+          puntuacion = int(datosNave[5]);
+          puntuacionMaxima = int(datosNave[6]);
+          vidas = int(datosNave[7]);
+          poderActivo = datosNave[8].equals("1");
+        }
 
-          String[] datosObstaculos = datos[1].split(" ");
-          for (int i = 0; i < maxObstaculos; i++) {
-            if (3 * i + 2 < datosObstaculos.length) {
-              obstaculoX[i] = int(datosObstaculos[3 * i]);
-              obstaculoY[i] = int(datosObstaculos[3 * i + 1]);
-              obstaculoEspecial[i] = int(datosObstaculos[3 * i + 2]);
-            } else {
-              obstaculoX[i] = -1;
-              obstaculoY[i] = -1;
-              obstaculoEspecial[i] = 0;
-            }
-          }
-
-          String[] datosBalas = datos[2].split(" ");
-          for (int i = 0; i < maxBalas; i++) {
-            if (2 * i + 1 < datosBalas.length) {
-              balaX[i] = int(datosBalas[2 * i]);
-              balaY[i] = int(datosBalas[2 * i + 1]);
-            } else {
-              balaX[i] = -1;
-              balaY[i] = -1;
-            }
-          }
-
-          String[] datosBalas2 = datos[3].split(" ");
-          for (int i = 0; i < maxBalas; i++) {
-            if (2 * i + 1 < datosBalas2.length) {
-              bala2X[i] = int(datosBalas2[2 * i]);
-              bala2Y[i] = int(datosBalas2[2 * i + 1]);
-            } else {
-              bala2X[i] = -1;
-              bala2Y[i] = -1;
-            }
+        String[] datosObstaculos = datos[1].split(" ");
+        for (int i = 0; i < maxObstaculos; i++) {
+          if (4 * i + 3 < datosObstaculos.length) {
+            obstaculoX[i] = int(datosObstaculos[4 * i]);
+            obstaculoY[i] = int(datosObstaculos[4 * i + 1]);
+            obstaculoEspecial[i] = int(datosObstaculos[4 * i + 2]);
+            obstaculoDesventaja[i] = int(datosObstaculos[4 * i + 3]);
+          } else {
+            obstaculoX[i] = -1;
+            obstaculoY[i] = -1;
+            obstaculoEspecial[i] = 0;
+            obstaculoDesventaja[i] = 0;
           }
         }
-      } else if (val.startsWith("EXPLOSION")) {
-        String[] datosExplosion = val.split(" ");
-        if (datosExplosion.length == 3) {
-          float x = float(datosExplosion[1]);
-          float y = float(datosExplosion[2]);
-          explosiones.add(new Explosion(x, y)); // Añadir nueva explosión
+
+        String[] datosBalas = datos[2].split(" ");
+        for (int i = 0; i < maxBalas; i++) {
+          if (2 * i + 1 < datosBalas.length) {
+            balaX[i] = int(datosBalas[2 * i]);
+            balaY[i] = int(datosBalas[2 * i + 1]);
+          } else {
+            balaX[i] = -1;
+            balaY[i] = -1;
+          }
         }
-      } else if (val.startsWith("COLISION")) {
-        String[] datosColision = val.split(" ");
-        if (datosColision.length == 3) {
-          float x = float(datosColision[1]);
-          float y = float(datosColision[2]);
-          colisiones.add(new Colision(x, y)); // Añadir nueva colisión
+
+        String[] datosBalas2 = datos[3].split(" ");
+        for (int i = 0; i < maxBalas; i++) {
+          if (2 * i + 1 < datosBalas2.length) {
+            bala2X[i] = int(datosBalas2[2 * i]);
+            bala2Y[i] = int(datosBalas2[2 * i + 1]);
+          } else {
+            bala2X[i] = -1;
+            bala2Y[i] = -1;
+          }
         }
+      }
+    } else if (val.startsWith("EXPLOSION")) {
+      String[] datosExplosion = val.split(" ");
+      if (datosExplosion.length == 3) {
+        float x = float(datosExplosion[1]);
+        float y = float(datosExplosion[2]);
+        explosiones.add(new Explosion(x, y)); // Añadir nueva explosión
+      }
+    } else if (val.startsWith("COLISION")) {
+      String[] datosColision = val.split(" ");
+      if (datosColision.length == 3) {
+        float x = float(datosColision[1]);
+        float y = float(datosColision[2]);
+        colisiones.add(new Colision(x, y)); // Añadir nueva colisión
       }
     }
   }
+}
 fill(255);
 // Dibujar nave 1 con una forma más estilizada
 beginShape();
@@ -132,6 +156,9 @@ for (int i = 0; i < maxObstaculos; i++) {
     if (obstaculoEspecial[i] == 1) {
       fill(0, 0, 255);
       ellipse(obstaculoX[i], obstaculoY[i], 30, 30); // Dibujar obstáculos especiales redondos y azules
+    } else if (obstaculoDesventaja[i] == 1) {
+      fill(255, 255, 0);
+      ellipse(obstaculoX[i], obstaculoY[i], 30, 30); // Dibujar obstáculos de desventaja redondos y amarillos
     } else {
       fill(255, 0, 0);
       ellipse(obstaculoX[i], obstaculoY[i], 20, 20); // Dibujar obstáculos normales redondos y rojos
@@ -168,22 +195,26 @@ for (int i = colisiones.size() - 1; i >= 0; i--) {
     colisiones.remove(i);
   }
 }
+
 fill(255);
 textSize(16);
+textAlign(LEFT); // Alinear el texto a la izquierda para los textos de puntuación y vidas
 text("Puntuación: " + puntuacion, 10, 20);
-text("Vidas: " + vidas, 10, 40);
+text("Puntuación más alta: " + puntuacionMaxima, 10, 40);
+text("Vidas: " + vidas, 10, 60);
 
 if (juegoTerminado) {
   fill(255, 0, 0);
   textSize(32);
-  text("GAME OVER", width / 2 - 100, height / 2);
+  textAlign(CENTER, CENTER); // Centrar el texto de "GAME OVER"
+  text("GAME OVER", width / 2, height / 2);
 }
-
 // Indicador del poder de disparo múltiple
 if (poderActivo) {
   fill(0, 255, 255);
   textSize(16);
-  text("Poder Activo: Disparo Múltiple", 10, 60);
+  text("Poder Activo: Disparo Múltiple", 10, 80);
+}
 }
 }
 

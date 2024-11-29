@@ -6,8 +6,10 @@ const int boton3 = 4; // Pin del botón 3 (izquierda nave 2)
 const int boton4 = 5; // Pin del botón 4 (derecha nave 2)
 const int anchoPantalla = 800;
 const int altoPantalla = 600;
-const int anchoNave = 40;
+const int anchoNaveNormal = 40;
 const int altoNave = 20;
+const int anchoNaveGrande = 60; // Tamaño más grande de la nave
+int anchoNave = anchoNaveNormal; // Tamaño inicial de la nave
 const int anchoObstaculo = 20;
 const int altoObstaculo = 20;
 const int anchoObstaculoEspecial = 30;
@@ -22,6 +24,7 @@ const int velocidadMaxObstaculo = 20; // Incrementamos significativamente la vel
 int naveX = anchoPantalla / 2;
 int nave2X = anchoPantalla / 2;
 int puntuacion = 0;
+int puntuacionMaxima = 0;
 int vidas = 5;
 bool segundoJugador = false;
 bool juegoTerminado = false;
@@ -38,6 +41,7 @@ struct Obstaculo {
   int velocidad;
   bool activo;
   bool especial;
+  bool desventaja;
 };
 
 struct Bala {
@@ -114,7 +118,8 @@ void actualizarJuego() {
         obstaculos[i].x = random(anchoPantalla);
         obstaculos[i].y = 0;
         obstaculos[i].velocidad = random(velocidadMinObstaculo, velocidadMaxObstaculo);
-        obstaculos[i].especial = random(100) < 20; // 20% de probabilidad de ser un obstáculo especial
+        obstaculos[i].especial = random(100) < 10; // 10% de probabilidad de ser un obstáculo especial
+        obstaculos[i].desventaja = random(100) < 10; // 10% de probabilidad de ser un obstáculo de desventaja
         obstaculos[i].activo = true;
         break;
       }
@@ -136,6 +141,9 @@ void actualizarJuego() {
         if (vidas <= 0) {
           juegoTerminado = true;
           tiempoJuegoTerminado = millis();
+          if (puntuacion > puntuacionMaxima) {
+            puntuacionMaxima = puntuacion; // Actualizar puntuación más alta
+          }
         }
         // Enviar señal de colisión con nave
         Serial.print("COLISION ");
@@ -163,6 +171,9 @@ void actualizarJuego() {
             poderActivo = true; // Activar poder al destruir obstáculo especial
             tiempoInicioPoder = millis();
           }
+          if (obstaculos[j].desventaja) {
+            anchoNave = anchoNaveGrande; // Aumentar tamaño de la nave al destruir obstáculo de desventaja
+          }
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
           Serial.print(obstaculos[j].x);
@@ -184,6 +195,9 @@ void actualizarJuego() {
           if (obstaculos[j].especial) {
             poderActivo = true; // Activar poder al destruir obstáculo especial
             tiempoInicioPoder = millis();
+          }
+          if (obstaculos[j].desventaja) {
+            anchoNave = anchoNaveGrande; // Aumentar tamaño de la nave al destruir obstáculo de desventaja
           }
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
@@ -247,6 +261,7 @@ void enviarEstadoAProcessing() {
   Serial.print(segundoJugador ? "1" : "0"); Serial.print(" ");
   Serial.print(juegoTerminado ? "1" : "0"); Serial.print(" ");
   Serial.print(puntuacion); Serial.print(" ");
+  Serial.print(puntuacionMaxima); Serial.print(" ");
   Serial.print(vidas); Serial.print(" ");
   Serial.print(poderActivo ? "1" : "0"); Serial.print(" | ");
   for (int i = 0; i < maxObstaculos; i++) {
@@ -254,8 +269,9 @@ void enviarEstadoAProcessing() {
       Serial.print(obstaculos[i].x); Serial.print(" ");
       Serial.print(obstaculos[i].y); Serial.print(" ");
       Serial.print(obstaculos[i].especial ? "1" : "0"); Serial.print(" ");
+      Serial.print(obstaculos[i].desventaja ? "1" : "0"); Serial.print(" ");
     } else {
-      Serial.print("-1 -1 0 "); // Indica obstáculo inactivo
+      Serial.print("-1 -1 0 0 "); // Indica obstáculo inactivo
     }
   }
   Serial.print("| ");
@@ -282,6 +298,7 @@ void enviarEstadoAProcessing() {
 void reiniciarJuego() {
   naveX = anchoPantalla / 2;
   nave2X = anchoPantalla / 2;
+  anchoNave = anchoNaveNormal; // Reiniciar tamaño de la nave
   segundoJugador = false;
   juegoTerminado = false;
   puntuacion = 0;
@@ -290,6 +307,7 @@ void reiniciarJuego() {
   for (int i = 0; i < maxObstaculos; i++) {
     obstaculos[i].activo = false;
     obstaculos[i].especial = false;
+    obstaculos[i].desventaja = false;
   }
   for (int i = 0; i < maxBalas; i++) {
     balas[i].activo = false;
