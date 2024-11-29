@@ -1,85 +1,237 @@
 #include <Wire.h>
 
-#define BOTON1 2   // Movimiento tanque 1 izquierda
-#define BOTON2 3   // Movimiento tanque 1 derecha
-#define BOTON3 4   // Movimiento tanque 2 izquierda
-#define BOTON4 5   // Movimiento tanque 2 derecha
+const int boton1 = 2; // Pin del botón 1
+const int boton2 = 3; // Pin del botón 2
+const int boton3 = 4; // Pin del botón 3 (izquierda nave 2)
+const int boton4 = 5; // Pin del botón 4 (derecha nave 2)
+const int anchoPantalla = 800;
+const int altoPantalla = 600;
+const int anchoNave = 40;
+const int altoNave = 20;
+const int anchoObstaculo = 20;
+const int altoObstaculo = 20;
+const int maxObstaculos = 10;
+const int maxBalas = 30;
+const int velocidadBala = 30; // Incrementamos significativamente la velocidad de las balas
+const int velocidadNave = 40; // Incrementamos significativamente la velocidad de las naves
+const int velocidadMinObstaculo = 14; // Incrementamos significativamente la velocidad mínima de los obstáculos
+const int velocidadMaxObstaculo = 20; // Incrementamos significativamente la velocidad máxima de los obstáculos
 
-int posicionTanque1 = 7;     // Posición inicial del tanque 1
-int posicionTanque2 = -1;    // Posición inicial del tanque 2 (-1 significa no visible)
-bool jugador2Activo = false; // Indica si el jugador 2 está habilitado
+int naveX = anchoPantalla / 2;
+int nave2X = anchoPantalla / 2;
+bool segundoJugador = false;
+bool juegoTerminado = false;
+unsigned long tiempoUltimaActualizacion = 0;
+unsigned long tiempoUltimoDisparo = 0;
+unsigned long tiempoJuegoTerminado = 0;
 
-int posicionBala1 = -1;  // Posición vertical de la bala del tanque 1 (-1 = sin bala)
-int posicionBala2 = -1;  // Posición vertical de la bala del tanque 2 (-1 = sin bala)
+struct Obstaculo {
+  int x;
+  int y;
+  int velocidad;
+  bool activo;
+};
 
-int posicionObstaculo[4] = {4, 8, 12, 15}; // Posiciones iniciales de los obstáculos
-int velocidadObstaculo[4] = {1, 1, 1, 1}; // Velocidad de caída de los obstáculos (más lento)
+struct Bala {
+  int x;
+  int y;
+  bool activo;
+};
+
+Obstaculo obstaculos[maxObstaculos];
+Bala balas[maxBalas];
+Bala balas2[maxBalas];
 
 void setup() {
-  Serial.begin(9600);  // Inicia la comunicación serie
-  pinMode(BOTON1, INPUT_PULLUP);
-  pinMode(BOTON2, INPUT_PULLUP);
-  pinMode(BOTON3, INPUT_PULLUP);
-  pinMode(BOTON4, INPUT_PULLUP);
-
-  delay(1000); // Espera 1 segundo antes de comenzar el juego
+  Serial.begin(57600); // Incrementamos la velocidad de comunicación
+  pinMode(boton1, INPUT_PULLUP);
+  pinMode(boton2, INPUT_PULLUP);
+  pinMode(boton3, INPUT_PULLUP);
+  pinMode(boton4, INPUT_PULLUP);
+  reiniciarJuego();
 }
 
 void loop() {
-  verificarActivacionJugador2(); // Verifica si se habilita el segundo jugador
-  moverTanque1();                // Movimiento del tanque 1
-  moverTanque2();                // Movimiento del tanque 2
-  actualizarBalas();             // Actualiza el disparo de los tanques
-  actualizarObstaculos();        // Mueve los obstáculos
-
-  // Crear el string con los datos
-  String datos = "tanque1:" + String(posicionTanque1) + ",bala1:" + String(posicionBala1) +
-                 ",tanque2:" + String(posicionTanque2) + ",bala2:" + String(posicionBala2);
-  
-  // Añadir las posiciones de los obstáculos
-  for (int i = 0; i < 4; i++) {
-    datos += ",obstaculo" + String(i) + ":" + String(posicionObstaculo[i]);
-  }
-  
-  // Enviar los datos a Processing
-  Serial.println(datos);
-
-  delay(100); // Ajustar la velocidad de envío de datos
-}
-
-void verificarActivacionJugador2() {
-  // Si cualquier botón del jugador 2 es presionado, activa el jugador 2
-  if (!jugador2Activo && (digitalRead(BOTON3) == LOW || digitalRead(BOTON4) == LOW)) {
-    jugador2Activo = true;
-    posicionTanque2 = 9; // Posición inicial del tanque 2
+  if (!juegoTerminado) {
+    manejarEntrada();
+    actualizarJuego();
+    enviarEstadoAProcessing();
+  } else {
+    if (millis() - tiempoJuegoTerminado > 2000) {
+      reiniciarJuego();
+    }
   }
 }
 
-void moverTanque1() {
-  if (digitalRead(BOTON1) == LOW && posicionTanque1 > 0) posicionTanque1--; // Izquierda
-  if (digitalRead(BOTON2) == LOW && posicionTanque1 < 15) posicionTanque1++; // Derecha
-  if (posicionBala1 == -1) posicionBala1 = 1; // Dispara si no hay bala
-}
-
-void moverTanque2() {
-  if (!jugador2Activo) return; // No hace nada si el segundo jugador no está activo
-  if (digitalRead(BOTON3) == LOW && posicionTanque2 > 0) posicionTanque2--; // Izquierda
-  if (digitalRead(BOTON4) == LOW && posicionTanque2 < 15) posicionTanque2++; // Derecha
-  if (posicionBala2 == -1) posicionBala2 = 1; // Dispara si no hay bala
-}
-
-void actualizarBalas() {
-  if (posicionBala1 >= 0) posicionBala1--; // Bala del tanque 1 sube
-  if (jugador2Activo && posicionBala2 >= 0) posicionBala2--; // Bala del tanque 2 sube
-
-  // Resetea las balas si llegan al final
-  if (posicionBala1 < 0) posicionBala1 = -1;
-  if (posicionBala2 < 0) posicionBala2 = -1;
-}
-
-void actualizarObstaculos() {
-  for (int i = 0; i < 4; i++) {
-    posicionObstaculo[i] += velocidadObstaculo[i]; // Los obstáculos caen lentamente
-    if (posicionObstaculo[i] > 15) posicionObstaculo[i] = 0; // Resetea si salen de la pantalla
+void manejarEntrada() {
+  if (digitalRead(boton1) == LOW) {
+    naveX -= velocidadNave;
+    if (naveX < 0) naveX = 0; // Límite izquierdo
+  } else if (digitalRead(boton2) == LOW) {
+    naveX += velocidadNave;
+    if (naveX > anchoPantalla - anchoNave) naveX = anchoPantalla - anchoNave; // Límite derecho
+  } else if (digitalRead(boton3) == LOW) {
+    nave2X -= velocidadNave;
+    segundoJugador = true;
+    if (nave2X < 0) nave2X = 0; // Límite izquierdo
+  } else if (digitalRead(boton4) == LOW) {
+    nave2X += velocidadNave;
+    segundoJugador = true;
+    if (nave2X > anchoPantalla - anchoNave) nave2X = anchoPantalla - anchoNave; // Límite derecho
   }
+
+  // Disparo cada 0.25 segundos
+  if (millis() - tiempoUltimoDisparo > 250) {
+    disparar();
+    if (segundoJugador) {
+      disparar2();
+    }
+    tiempoUltimoDisparo = millis();
+  }
+}
+
+void actualizarJuego() {
+  // Crear nuevos obstáculos
+  if (millis() - tiempoUltimaActualizacion > 50) { // Actualizamos más frecuentemente
+    for (int i = 0; i < maxObstaculos; i++) {
+      if (!obstaculos[i].activo) {
+        obstaculos[i].x = random(anchoPantalla);
+        obstaculos[i].y = 0;
+        obstaculos[i].velocidad = random(velocidadMinObstaculo, velocidadMaxObstaculo);
+        obstaculos[i].activo = true;
+        break;
+      }
+    }
+    tiempoUltimaActualizacion = millis();
+  }
+
+  // Mover obstáculos y detectar colisiones
+  for (int i = 0; i < maxObstaculos; i++) {
+    if (obstaculos[i].activo) {
+      obstaculos[i].y += obstaculos[i].velocidad;
+      if (obstaculos[i].y > altoPantalla) {
+        obstaculos[i].activo = false;
+      }
+
+      if (colisiona(naveX, altoPantalla - altoNave, anchoNave, altoNave, obstaculos[i].x, obstaculos[i].y, anchoObstaculo, altoObstaculo) ||
+          (segundoJugador && colisiona(nave2X, altoPantalla - altoNave - 30, anchoNave, altoNave, obstaculos[i].x, obstaculos[i].y, anchoObstaculo, altoObstaculo))) {
+        juegoTerminado = true;
+        tiempoJuegoTerminado = millis();
+      }
+    }
+  }
+
+  // Mover balas y detectar colisiones con obstáculos
+  for (int i = 0; i < maxBalas; i++) {
+    if (balas[i].activo) {
+      balas[i].y -= velocidadBala;
+      if (balas[i].y < 0) {
+        balas[i].activo = false;
+      }
+      for (int j = 0; j < maxObstaculos; j++) {
+        if (obstaculos[j].activo && colisiona(balas[i].x, balas[i].y, 5, 10, obstaculos[j].x, obstaculos[j].y, anchoObstaculo, altoObstaculo)) {
+          balas[i].activo = false;
+          obstaculos[j].activo = false;
+          // Enviar señal de explosión
+          Serial.print("EXPLOSION ");
+          Serial.print(obstaculos[j].x);
+          Serial.print(" ");
+          Serial.println(obstaculos[j].y);
+        }
+      }
+    }
+    if (balas2[i].activo) {
+      balas2[i].y -= velocidadBala;
+      if (balas2[i].y < 0) {
+        balas2[i].activo = false;
+      }
+      for (int j = 0; j < maxObstaculos; j++) {
+        if (obstaculos[j].activo && colisiona(balas2[i].x, balas2[i].y, 5, 10, obstaculos[j].x, obstaculos[j].y, anchoObstaculo, altoObstaculo)) {
+          balas2[i].activo = false;
+          obstaculos[j].activo = false;
+          // Enviar señal de explosión
+          Serial.print("EXPLOSION ");
+          Serial.print(obstaculos[j].x);
+          Serial.print(" ");
+          Serial.println(obstaculos[j].y);
+        }
+      }
+    }
+  }
+}
+
+bool colisiona(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+  return !(x1 + w1 < x2 || x2 + w2 < x1 || y1 + h1 < y2 || y2 + h2 < y1);
+}
+
+void disparar() {
+  for (int i = 0; i < maxBalas; i++) {
+    if (!balas[i].activo) {
+      balas[i].x = naveX + anchoNave / 2 - 2;
+      balas[i].y = altoPantalla - altoNave;
+      balas[i].activo = true;
+      break;
+    }
+  }
+}
+
+void disparar2() {
+  for (int i = 0; i < maxBalas; i++) {
+    if (!balas2[i].activo) {
+      balas2[i].x = nave2X + anchoNave / 2 - 2;
+      balas2[i].y = altoPantalla - altoNave - 30;
+      balas2[i].activo = true;
+      break;
+    }
+  }
+}
+
+void enviarEstadoAProcessing() {
+  Serial.print("NAVES ");
+  Serial.print(naveX); Serial.print(" ");
+  Serial.print(nave2X); Serial.print(" ");
+  Serial.print(segundoJugador ? "1" : "0"); Serial.print(" ");
+  Serial.print(juegoTerminado ? "1" : "0"); Serial.print(" | ");
+  for (int i = 0; i < maxObstaculos; i++) {
+    if (obstaculos[i].activo) {
+      Serial.print(obstaculos[i].x); Serial.print(" ");
+      Serial.print(obstaculos[i].y); Serial.print(" ");
+    } else {
+      Serial.print("-1 -1 "); // Indica obstáculo inactivo
+    }
+  }
+  Serial.print("| ");
+  for (int i = 0; i < maxBalas; i++) {
+    if (balas[i].activo) {
+      Serial.print(balas[i].x); Serial.print(" ");
+      Serial.print(balas[i].y); Serial.print(" ");
+    } else {
+      Serial.print("-1 -1 "); // Indica bala inactiva
+    }
+  }
+  Serial.print("| ");
+  for (int i = 0; i < maxBalas; i++) {
+    if (balas2[i].activo) {
+      Serial.print(balas2[i].x); Serial.print(" ");
+      Serial.print(balas2[i].y); Serial.print(" ");
+    } else {
+      Serial.print("-1 -1 "); // Indica bala inactiva
+    }
+  }
+  Serial.println();
+}
+
+void reiniciarJuego() {
+  naveX = anchoPantalla / 2;
+  nave2X = anchoPantalla / 2;
+  segundoJugador = false;
+  juegoTerminado = false;
+  for (int i = 0; i < maxObstaculos; i++) {
+    obstaculos[i].activo = false;
+  }
+  for (int i = 0; i < maxBalas; i++) {
+    balas[i].activo = false;
+    balas2[i].activo = false;
+  }
+  tiempoUltimaActualizacion = millis();
 }

@@ -1,92 +1,172 @@
-import java.util.ArrayList;
 import processing.serial.*;
-Serial miPuerto;  // Variable para la comunicación serial
-int[] posicionTanque1 = new int[2]; // Posición del tanque 1
-int[] posicionTanque2 = new int[2]; // Posición del tanque 2
-ArrayList<int[]> obstaculos = new ArrayList<int[]>();  // Lista de obstáculos
-ArrayList<int[]> balas = new ArrayList<int[]>();    // Lista de balas
+import java.util.ArrayList;
+
+Serial miPuerto;
+int naveX;
+int nave2X;
+boolean segundoJugador;
+boolean juegoTerminado;
+int[] obstaculoX;
+int[] obstaculoY;
+int maxObstaculos = 10;
+int[] balaX;
+int[] balaY;
+int[] bala2X;
+int[] bala2Y;
+int maxBalas = 30;
+ArrayList<Explosion> explosiones; // Lista de explosiones
 
 void setup() {
-  size(400, 400);
-  miPuerto = new Serial(this, "COM4", 9600);  // Ajusta el puerto si es necesario
-  frameRate(60);  // Establece una tasa de fotogramas más alta para una mayor fluidez
+  size(800, 600);
+  frameRate(60); // Configurar la tasa de fotogramas a 60 fps
+  miPuerto = new Serial(this, Serial.list()[1], 57600); // Ajuste del puerto
+  obstaculoX = new int[maxObstaculos];
+  obstaculoY = new int[maxObstaculos];
+  balaX = new int[maxBalas];
+  balaY = new int[maxBalas];
+  bala2X = new int[maxBalas];
+  bala2Y = new int[maxBalas];
+  explosiones = new ArrayList<Explosion>(); // Inicializar lista de explosiones
 }
 
 void draw() {
   background(0);
-  
-  // Lee los datos del Arduino
   if (miPuerto.available() > 0) {
-    String datos = miPuerto.readStringUntil('\n');
-    if (datos != null) {
-      String[] tokens = split(datos, ',');
-      
-      // Actualizar las posiciones de los tanques
-      posicionTanque1[0] = int(split(tokens[0], ':')[1]);
-      posicionTanque1[1] = 300;  // Fija la nave en la parte inferior
-      
-      if (tokens.length > 2 && tokens[2].contains("tanque2")) {
-        posicionTanque2[0] = int(split(tokens[2], ':')[1]);
-        posicionTanque2[1] = 300;
-      }
-      
-      // Actualizar las posiciones de las balas
-      balas.clear();  // Limpiamos la lista de balas
-      if (tokens.length > 1) {
-        String[] datosBala1 = split(tokens[1], ':');
-        if (datosBala1.length > 1) {
-          int[] bala1 = { posicionTanque1[0], int(datosBala1[1]) };  // Agregar la posición de la bala del tanque 1
-          balas.add(bala1);
+    String val = miPuerto.readStringUntil('\n');
+    if (val != null) {
+      val = val.trim();
+      if (val.startsWith("NAVES")) {
+        String[] data = val.split(" \\| ");
+        if (data.length == 4) {
+          String[] datosNave = data[0].split(" ");
+          if (datosNave.length >= 5) {
+            naveX = int(datosNave[1]);
+            nave2X = int(datosNave[2]);
+            segundoJugador = datosNave[3].equals("1");
+            juegoTerminado = datosNave[4].equals("1");
+          }
+
+          String[] datosObstaculos = data[1].split(" ");
+          for (int i = 0; i < maxObstaculos; i++) {
+            if (2 * i + 1 < datosObstaculos.length) {
+              obstaculoX[i] = int(datosObstaculos[2 * i]);
+              obstaculoY[i] = int(datosObstaculos[2 * i + 1]);
+            } else {
+              obstaculoX[i] = -1;
+              obstaculoY[i] = -1;
+            }
+          }
+
+          String[] datosBalas = data[2].split(" ");
+          for (int i = 0; i < maxBalas; i++) {
+            if (2 * i + 1 < datosBalas.length) {
+              balaX[i] = int(datosBalas[2 * i]);
+              balaY[i] = int(datosBalas[2 * i + 1]);
+            } else {
+              balaX[i] = -1;
+              balaY[i] = -1;
+            }
+          }
+
+          String[] datosBalas2 = data[3].split(" ");
+          for (int i = 0; i < maxBalas; i++) {
+            if (2 * i + 1 < datosBalas2.length) {
+              bala2X[i] = int(datosBalas2[2 * i]);
+              bala2Y[i] = int(datosBalas2[2 * i + 1]);
+            } else {
+              bala2X[i] = -1;
+              bala2Y[i] = -1;
+            }
+          }
         }
-      }
-      
-      if (tokens.length > 3) {
-        String[] datosBala2 = split(tokens[3], ':');
-        if (datosBala2.length > 1) {
-          int[] bala2 = { posicionTanque2[0], int(datosBala2[1]) };  // Agregar la posición de la bala del tanque 2
-          balas.add(bala2);
+      } else if (val.startsWith("EXPLOSION")) {
+        String[] datosExplosion = val.split(" ");
+        if (datosExplosion.length == 3) {
+          float x = float(datosExplosion[1]);
+          float y = float(datosExplosion[2]);
+          explosiones.add(new Explosion(x, y)); // Añadir nueva explosión
         }
-      }
-      
-      // Actualizar las posiciones de los obstáculos
-      obstaculos.clear();
-      for (int i = 4; i < tokens.length; i++) {
-        String[] datosObstaculo = split(tokens[i], ':');
-        int[] obstaculo = { int(datosObstaculo[1]), i - 4};
-        obstaculos.add(obstaculo);
       }
     }
   }
 
-  // Mostrar y mover los obstáculos
-  fill(255, 0, 0);
-  for (int[] obstaculo : obstaculos) {
-    ellipse(obstaculo[0] * 20, obstaculo[1] * 20, 15, 15);
-    obstaculo[1]++;  // Los obstáculos caen lentamente
-    if (obstaculo[1] > height) obstaculo[1] = 0; // Resetea si salen de la pantalla
-  }
-
-  // Mostrar las balas y moverlas hacia arriba
   fill(255);
+  // Dibujar nave 1 con una forma más estilizada
+  beginShape();
+  vertex(naveX, height - 20);
+  vertex(naveX + 20, height - 40);
+  vertex(naveX + 40, height - 20);
+  endShape(CLOSE);
   
-  // Crear una lista para almacenar las balas que deben eliminarse
-  ArrayList<int[]> balasAEliminar = new ArrayList<int[]>();
-  
-  for (int[] bala : balas) {
-    ellipse(bala[0] * 20, bala[1] - 10, 5, 5);  // Mover balas hacia arriba
-    bala[1]--;  // Desplaza la bala hacia arriba
-    if (bala[1] < 0) {
-      balasAEliminar.add(bala);  // Añadir la bala a la lista de eliminación
-    }
-  }
-  
-  // Eliminar las balas fuera de la pantalla
-  for (int[] bala : balasAEliminar) {
-    balas.remove(bala);
+  if (segundoJugador) {
+    // Dibujar nave 2 con una forma más estilizada
+    beginShape();
+    vertex(nave2X, height - 50);
+    vertex(nave2X + 20, height - 70);
+    vertex(nave2X + 40, height - 50);
+    endShape(CLOSE);
   }
 
-  // Mostrar los tanques
+  fill(255, 0, 0);
+  for (int i = 0; i < maxObstaculos; i++) {
+    if (obstaculoX[i] != -1 && obstaculoY[i] != -1) {
+      ellipse(obstaculoX[i], obstaculoY[i], 20, 20); // Dibujar obstáculos redondos
+    }
+  }
+
   fill(0, 255, 0);
-  rect(posicionTanque1[0] * 20, posicionTanque1[1], 20, 10);  // Tanque 1
-  rect(posicionTanque2[0] * 20, posicionTanque2[1], 20, 10);  // Tanque 2
+  for (int i = 0; i < maxBalas; i++) {
+    if (balaX[i] != -1 && balaY[i] != -1) {
+      rect(balaX[i], balaY[i], 5, 10); // Dibujar balas de la nave 1
+    }
+    if (bala2X[i] != -1 && bala2Y[i] != -1) {
+      rect(bala2X[i], bala2Y[i], 5, 10); // Dibujar balas de la nave 2
+    }
+  }
+
+  // Dibujar explosiones
+  for (int i = explosiones.size() - 1; i >= 0; i--) {
+    Explosion explosion = explosiones.get(i);
+    explosion.actualizar();
+    explosion.mostrar();
+    if (explosion.terminada()) {
+      explosiones.remove(i);
+    }
+  }
+
+  if (juegoTerminado) {
+    fill(255, 0, 0);
+    textSize(32);
+    text("GAME OVER", width / 2 - 100, height / 2);
+  }
+}
+
+class Explosion {
+  float x, y;
+  int duracion;
+  int duracionMaxima;
+  
+  Explosion(float x, float y) {
+    this.x = x;
+    this.y = y;
+    this.duracion = 100;
+    this.duracionMaxima = 100;
+  }
+  
+  void actualizar() {
+    duracion--;
+  }
+  
+  void mostrar() {
+    float alpha = map(duracion, 0, duracionMaxima, 0, 255);
+    noStroke();
+    fill(255, 255, 0, alpha);
+    ellipse(x, y, 40, 40); // Explosión amarilla
+    fill(255, 0, 0, alpha);
+    ellipse(x, y, 20, 20); // Núcleo rojo de la explosión
+  }
+  
+  boolean terminada() {
+    return duracion <= 0;
+  }
 }
