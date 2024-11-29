@@ -6,10 +6,12 @@ int naveX;
 int nave2X;
 boolean segundoJugador;
 boolean juegoTerminado;
+boolean poderActivo;
 int puntuacion;
 int vidas;
 int[] obstaculoX;
 int[] obstaculoY;
+int[] obstaculoEspecial; // Array para indicar si el obstáculo es especial
 int maxObstaculos = 10;
 int[] balaX;
 int[] balaY;
@@ -25,6 +27,7 @@ void setup() {
   miPuerto = new Serial(this, Serial.list()[1], 57600); // Ajuste del puerto
   obstaculoX = new int[maxObstaculos];
   obstaculoY = new int[maxObstaculos];
+  obstaculoEspecial = new int[maxObstaculos]; // Inicializar array de obstáculos especiales
   balaX = new int[maxBalas];
   balaY = new int[maxBalas];
   bala2X = new int[maxBalas];
@@ -45,23 +48,26 @@ void draw() {
         String[] datos = val.split(" \\| ");
         if (datos.length == 4) {
           String[] datosNave = datos[0].split(" ");
-          if (datosNave.length >= 7) {
+          if (datosNave.length >= 8) {
             naveX = int(datosNave[1]);
             nave2X = int(datosNave[2]);
             segundoJugador = datosNave[3].equals("1");
             juegoTerminado = datosNave[4].equals("1");
             puntuacion = int(datosNave[5]);
             vidas = int(datosNave[6]);
+            poderActivo = datosNave[7].equals("1");
           }
 
           String[] datosObstaculos = datos[1].split(" ");
           for (int i = 0; i < maxObstaculos; i++) {
-            if (2 * i + 1 < datosObstaculos.length) {
-              obstaculoX[i] = int(datosObstaculos[2 * i]);
-              obstaculoY[i] = int(datosObstaculos[2 * i + 1]);
+            if (3 * i + 2 < datosObstaculos.length) {
+              obstaculoX[i] = int(datosObstaculos[3 * i]);
+              obstaculoY[i] = int(datosObstaculos[3 * i + 1]);
+              obstaculoEspecial[i] = int(datosObstaculos[3 * i + 2]);
             } else {
               obstaculoX[i] = -1;
               obstaculoY[i] = -1;
+              obstaculoEspecial[i] = 0;
             }
           }
 
@@ -121,10 +127,15 @@ if (segundoJugador) {
   endShape(CLOSE);
 }
 
-fill(255, 0, 0);
 for (int i = 0; i < maxObstaculos; i++) {
   if (obstaculoX[i] != -1 && obstaculoY[i] != -1) {
-    ellipse(obstaculoX[i], obstaculoY[i], 20, 20); // Dibujar obstáculos redondos
+    if (obstaculoEspecial[i] == 1) {
+      fill(0, 0, 255);
+      ellipse(obstaculoX[i], obstaculoY[i], 30, 30); // Dibujar obstáculos especiales redondos y azules
+    } else {
+      fill(255, 0, 0);
+      ellipse(obstaculoX[i], obstaculoY[i], 20, 20); // Dibujar obstáculos normales redondos y rojos
+    }
   }
 }
 
@@ -157,7 +168,6 @@ for (int i = colisiones.size() - 1; i >= 0; i--) {
     colisiones.remove(i);
   }
 }
-
 fill(255);
 textSize(16);
 text("Puntuación: " + puntuacion, 10, 20);
@@ -167,6 +177,13 @@ if (juegoTerminado) {
   fill(255, 0, 0);
   textSize(32);
   text("GAME OVER", width / 2 - 100, height / 2);
+}
+
+// Indicador del poder de disparo múltiple
+if (poderActivo) {
+  fill(0, 255, 255);
+  textSize(16);
+  text("Poder Activo: Disparo Múltiple", 10, 60);
 }
 }
 

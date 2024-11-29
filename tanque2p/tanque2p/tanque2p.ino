@@ -10,6 +10,8 @@ const int anchoNave = 40;
 const int altoNave = 20;
 const int anchoObstaculo = 20;
 const int altoObstaculo = 20;
+const int anchoObstaculoEspecial = 30;
+const int altoObstaculoEspecial = 30;
 const int maxObstaculos = 10;
 const int maxBalas = 30;
 const int velocidadBala = 30; // Incrementamos significativamente la velocidad de las balas
@@ -23,6 +25,9 @@ int puntuacion = 0;
 int vidas = 5;
 bool segundoJugador = false;
 bool juegoTerminado = false;
+bool poderActivo = false;
+unsigned long tiempoInicioPoder = 0;
+unsigned long duracionPoder = 5000; // Duración del poder en milisegundos (5 segundos)
 unsigned long tiempoUltimaActualizacion = 0;
 unsigned long tiempoUltimoDisparo = 0;
 unsigned long tiempoJuegoTerminado = 0;
@@ -32,6 +37,7 @@ struct Obstaculo {
   int y;
   int velocidad;
   bool activo;
+  bool especial;
 };
 
 struct Bala {
@@ -63,6 +69,11 @@ void loop() {
       reiniciarJuego();
     }
   }
+
+  // Desactivar el poder después de que pase el tiempo de duración
+  if (poderActivo && millis() - tiempoInicioPoder > duracionPoder) {
+    poderActivo = false;
+  }
 }
 
 void manejarEntrada() {
@@ -84,7 +95,11 @@ void manejarEntrada() {
 
   // Disparo cada 0.25 segundos
   if (millis() - tiempoUltimoDisparo > 250) {
-    disparar();
+    if (poderActivo) {
+      dispararTriple(); // Disparo múltiple cuando el poder está activo
+    } else {
+      disparar();
+    }
     if (segundoJugador) {
       disparar2();
     }
@@ -99,6 +114,7 @@ void actualizarJuego() {
         obstaculos[i].x = random(anchoPantalla);
         obstaculos[i].y = 0;
         obstaculos[i].velocidad = random(velocidadMinObstaculo, velocidadMaxObstaculo);
+        obstaculos[i].especial = random(100) < 20; // 20% de probabilidad de ser un obstáculo especial
         obstaculos[i].activo = true;
         break;
       }
@@ -143,6 +159,10 @@ void actualizarJuego() {
           balas[i].activo = false;
           obstaculos[j].activo = false;
           puntuacion++; // Incrementar puntuación
+          if (obstaculos[j].especial) {
+            poderActivo = true; // Activar poder al destruir obstáculo especial
+            tiempoInicioPoder = millis();
+          }
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
           Serial.print(obstaculos[j].x);
@@ -161,6 +181,10 @@ void actualizarJuego() {
           balas2[i].activo = false;
           obstaculos[j].activo = false;
           puntuacion++; // Incrementar puntuación
+          if (obstaculos[j].especial) {
+            poderActivo = true; // Activar poder al destruir obstáculo especial
+            tiempoInicioPoder = millis();
+          }
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
           Serial.print(obstaculos[j].x);
@@ -197,6 +221,25 @@ void disparar2() {
   }
 }
 
+void dispararTriple() {
+  for (int i = 0; i < maxBalas; i++) {
+    if (!balas[i].activo) {
+      balas[i].x = naveX + anchoNave / 2 - 12;
+      balas[i].y = altoPantalla - altoNave;
+      balas[i].activo = true;
+      i++;
+      balas[i].x = naveX + anchoNave / 2 - 2;
+      balas[i].y = altoPantalla - altoNave;
+      balas[i].activo = true;
+      i++;
+      balas[i].x = naveX + anchoNave / 2 + 8;
+      balas[i].y = altoPantalla - altoNave;
+      balas[i].activo = true;
+      break;
+    }
+  }
+}
+
 void enviarEstadoAProcessing() {
   Serial.print("NAVES ");
   Serial.print(naveX); Serial.print(" ");
@@ -204,13 +247,15 @@ void enviarEstadoAProcessing() {
   Serial.print(segundoJugador ? "1" : "0"); Serial.print(" ");
   Serial.print(juegoTerminado ? "1" : "0"); Serial.print(" ");
   Serial.print(puntuacion); Serial.print(" ");
-  Serial.print(vidas); Serial.print(" | ");
+  Serial.print(vidas); Serial.print(" ");
+  Serial.print(poderActivo ? "1" : "0"); Serial.print(" | ");
   for (int i = 0; i < maxObstaculos; i++) {
     if (obstaculos[i].activo) {
       Serial.print(obstaculos[i].x); Serial.print(" ");
       Serial.print(obstaculos[i].y); Serial.print(" ");
+      Serial.print(obstaculos[i].especial ? "1" : "0"); Serial.print(" ");
     } else {
-      Serial.print("-1 -1 "); // Indica obstáculo inactivo
+      Serial.print("-1 -1 0 "); // Indica obstáculo inactivo
     }
   }
   Serial.print("| ");
@@ -241,8 +286,10 @@ void reiniciarJuego() {
   juegoTerminado = false;
   puntuacion = 0;
   vidas = 5;
+  poderActivo = false;
   for (int i = 0; i < maxObstaculos; i++) {
     obstaculos[i].activo = false;
+    obstaculos[i].especial = false;
   }
   for (int i = 0; i < maxBalas; i++) {
     balas[i].activo = false;
