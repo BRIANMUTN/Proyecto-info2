@@ -19,6 +19,8 @@ const int velocidadMaxObstaculo = 20; // Incrementamos significativamente la vel
 
 int naveX = anchoPantalla / 2;
 int nave2X = anchoPantalla / 2;
+int puntuacion = 0;
+int vidas = 5;
 bool segundoJugador = false;
 bool juegoTerminado = false;
 unsigned long tiempoUltimaActualizacion = 0;
@@ -89,7 +91,6 @@ void manejarEntrada() {
     tiempoUltimoDisparo = millis();
   }
 }
-
 void actualizarJuego() {
   // Crear nuevos obstáculos
   if (millis() - tiempoUltimaActualizacion > 50) { // Actualizamos más frecuentemente
@@ -115,8 +116,17 @@ void actualizarJuego() {
 
       if (colisiona(naveX, altoPantalla - altoNave, anchoNave, altoNave, obstaculos[i].x, obstaculos[i].y, anchoObstaculo, altoObstaculo) ||
           (segundoJugador && colisiona(nave2X, altoPantalla - altoNave - 30, anchoNave, altoNave, obstaculos[i].x, obstaculos[i].y, anchoObstaculo, altoObstaculo))) {
-        juegoTerminado = true;
-        tiempoJuegoTerminado = millis();
+        vidas--;
+        if (vidas <= 0) {
+          juegoTerminado = true;
+          tiempoJuegoTerminado = millis();
+        }
+        // Enviar señal de colisión con nave
+        Serial.print("COLISION ");
+        Serial.print(obstaculos[i].x);
+        Serial.print(" ");
+        Serial.println(obstaculos[i].y);
+        obstaculos[i].activo = false;
       }
     }
   }
@@ -132,6 +142,7 @@ void actualizarJuego() {
         if (obstaculos[j].activo && colisiona(balas[i].x, balas[i].y, 5, 10, obstaculos[j].x, obstaculos[j].y, anchoObstaculo, altoObstaculo)) {
           balas[i].activo = false;
           obstaculos[j].activo = false;
+          puntuacion++; // Incrementar puntuación
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
           Serial.print(obstaculos[j].x);
@@ -149,6 +160,7 @@ void actualizarJuego() {
         if (obstaculos[j].activo && colisiona(balas2[i].x, balas2[i].y, 5, 10, obstaculos[j].x, obstaculos[j].y, anchoObstaculo, altoObstaculo)) {
           balas2[i].activo = false;
           obstaculos[j].activo = false;
+          puntuacion++; // Incrementar puntuación
           // Enviar señal de explosión
           Serial.print("EXPLOSION ");
           Serial.print(obstaculos[j].x);
@@ -163,7 +175,6 @@ void actualizarJuego() {
 bool colisiona(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
   return !(x1 + w1 < x2 || x2 + w2 < x1 || y1 + h1 < y2 || y2 + h2 < y1);
 }
-
 void disparar() {
   for (int i = 0; i < maxBalas; i++) {
     if (!balas[i].activo) {
@@ -191,7 +202,9 @@ void enviarEstadoAProcessing() {
   Serial.print(naveX); Serial.print(" ");
   Serial.print(nave2X); Serial.print(" ");
   Serial.print(segundoJugador ? "1" : "0"); Serial.print(" ");
-  Serial.print(juegoTerminado ? "1" : "0"); Serial.print(" | ");
+  Serial.print(juegoTerminado ? "1" : "0"); Serial.print(" ");
+  Serial.print(puntuacion); Serial.print(" ");
+  Serial.print(vidas); Serial.print(" | ");
   for (int i = 0; i < maxObstaculos; i++) {
     if (obstaculos[i].activo) {
       Serial.print(obstaculos[i].x); Serial.print(" ");
@@ -226,6 +239,8 @@ void reiniciarJuego() {
   nave2X = anchoPantalla / 2;
   segundoJugador = false;
   juegoTerminado = false;
+  puntuacion = 0;
+  vidas = 5;
   for (int i = 0; i < maxObstaculos; i++) {
     obstaculos[i].activo = false;
   }
