@@ -98,9 +98,7 @@ void loop() {
     actualizarJuego();// Mueve elementos y detecta colisiones
     enviarEstadoAProcessing();
   } else {
-    if (millis() - tiempoJuegoTerminado > 2000) { // Reinicia el juego tras 2 segundos
-      reiniciarJuego(); 
-    }
+//AGREGAR ESPERA A RECIBIR DE PROCESSING
   }
 
   // Desactivar el poder después de que pase el tiempo de duración
