@@ -46,10 +46,26 @@ int botonReanudarX, botonReanudarY, botonReanudarAncho, botonReanudarAlto; // Po
 int botonReiniciarX, botonReiniciarY, botonReiniciarAncho, botonReiniciarAlto; // Posición y tamaño del botón "Reiniciar"
 int botonSalirX, botonSalirY, botonSalirAncho, botonSalirAlto; // Posición y tamaño del botón "Salir"
 
+//Variables para menu fin
+int botonContinuarX, botonContinuarY, botonContinuarAncho, botonContinuarAlto;
+int botonFinalizarX, botonFinalizarY, botonFinalizarAncho, botonFinalizarAlto;
+
+// Variables para nombres
+String nombreJugador = "";
+boolean ingresarNombre = false;
+ArrayList<String> ranking = new ArrayList<String>();
+
 void setup() {
   size(800, 600); // Configurar el tamaño de la ventana del juego
   frameRate(60); // Configurar la tasa de fotogramas a 60 fps
   miPuerto = new Serial(this, Serial.list()[1], 57600); // Configurar la comunicación serial
+  //Leer archivo de ranking si existe
+String[] lines = loadStrings("ranking.txt"); 
+if (lines != null) { 
+  for (String line : lines) { 
+    ranking.add(line); 
+  } 
+}
 
   // Configurar las posiciones y tamaños de los botones del menú principal
   botonIniciarAncho = 200;
@@ -82,6 +98,18 @@ void setup() {
   botonSalirAlto = 50;
   botonSalirX = (width - botonSalirAncho) / 2;
   botonSalirY = height / 2 + 80;
+  
+  // Configurar botones del menu de fin
+  botonContinuarAncho = 200;
+  botonContinuarAlto = 50;
+  botonContinuarX = (width - botonContinuarAncho) / 2;
+  botonContinuarY = height / 2 + 40;
+  
+  botonFinalizarAncho = 200;
+  botonFinalizarAlto = 50;
+  botonFinalizarX = (width - botonFinalizarAncho) / 2;
+  botonFinalizarY = height / 2 + 120;
+
 
   // Inicializar los arrays y las listas
   obstaculoX = new int[maxObstaculos];
@@ -282,7 +310,41 @@ if (juegoTerminado) {
   fill(255, 0, 0); // Color del texto en rojo para el GAME OVER
   textSize(32); // Establecer el tamaño del texto
   textAlign(CENTER, CENTER); // Centrar el texto del GAME OVER
-  text("GAME OVER", width / 2, height / 2); // Mostrar "GAME OVER" en el centro de la pantalla
+  text("GAME OVER", width / 2, height / 2 - 40); // Mostrar "GAME OVER" en el centro de la pantalla
+
+  // Dibujar botón de Continuar
+  fill(mouseOverBoton(botonContinuarX, botonContinuarY, botonContinuarAncho, botonContinuarAlto) ? 200 : 255);
+  rect(botonContinuarX, botonContinuarY, botonContinuarAncho, botonContinuarAlto);
+  fill(0);
+  text("Continuar", botonContinuarX + botonContinuarAncho / 2, botonContinuarY + botonContinuarAlto / 2);
+
+  // Dibujar botón de Finalizar
+  fill(mouseOverBoton(botonFinalizarX, botonFinalizarY, botonFinalizarAncho, botonFinalizarAlto) ? 200 : 255);
+  rect(botonFinalizarX, botonFinalizarY, botonFinalizarAncho, botonFinalizarAlto);
+  fill(0);
+  text("Finalizar", botonFinalizarX + botonFinalizarAncho / 2, botonFinalizarY + botonFinalizarAlto / 2);
+  
+  // Mostrar el ranking 
+  fill(255); // Establecer el color del texto en blanco 
+  textSize(24); // Establecer el tamaño del texto para el ranking 
+  textAlign(LEFT); // Alinear el texto a la izquierda
+  int y = height / 2 -40; // Posición Y inicial para el ranking 
+  int x = 50; // Posición X inicial para el ranking
+  text("Ranking:", x, y); 
+  y += 30; // Incrementar la posición Y para la primera entrada del ranking 
+  for (int i = 0; i < min(5, ranking.size()); i++) { // Mostrar los primeros 5 elementos del ranking 
+  text((i + 1) + ". " + ranking.get(i), x, y); 
+  y += 30;
+}
+}
+  //Ingresar nombre
+if (ingresarNombre) {
+  background(0);
+  fill(255);
+  textSize(32);
+  textAlign(CENTER, CENTER);
+  text("Ingresa tu nombre:", width / 2, height / 3);
+  text(nombreJugador, width / 2, height / 2);
 }
 
 // Mostrar indicador del poder de disparo múltiple
@@ -402,6 +464,27 @@ void mostrarMenuPausa() {
 boolean mouseOverBoton(int x, int y, int ancho, int alto) {
   return mouseX > x && mouseX < x + ancho && mouseY > y && mouseY < y + alto;
 }
+//Teclas presionadas
+void keyPressed() {
+  if (ingresarNombre) {
+    if (key == ENTER || key == RETURN) {
+      guardarRanking(); // Guardar el nombre y la puntuación al presionar Enter
+      ingresarNombre = false; // Terminar el ingreso del nombre
+      reiniciarJuego(); // Llamada a la función reiniciarJuego
+    } else if (key == BACKSPACE && nombreJugador.length() > 0) {
+      nombreJugador = nombreJugador.substring(0, nombreJugador.length() - 1); // Borrar el último caracter
+    } else if (key != CODED) {
+      nombreJugador += key; // Añadir la tecla presionada al nombre
+    }
+  }
+}
+
+void guardarRanking() {
+  ranking.add(nombreJugador + " " + puntuacionMaxima);
+  ranking.sort((a, b) -> int(b.split(" ")[1]) - int(a.split(" ")[1])); // Ordenar por puntuación descendente
+  saveStrings("ranking.txt", ranking.toArray(new String[0]));
+}
+
 
 void mousePressed() {
   if (mostrarMenu) {
@@ -422,11 +505,23 @@ void mousePressed() {
     } else if (mouseOverBoton(botonSalirX, botonSalirY, botonSalirAncho, botonSalirAlto)) {
       exit(); // Salir del programa
     }
-  } else {
+
+  }
+      else if (juegoTerminado) {
+      if (mouseOverBoton(botonContinuarX, botonContinuarY, botonContinuarAncho, botonContinuarAlto)) {
+        reiniciarJuego(); // Llama a la función para reiniciar el juego
+      } else if (mouseOverBoton(botonFinalizarX, botonFinalizarY, botonFinalizarAncho, botonFinalizarAlto)) {
+        // Funcion de guardado en archivo A ARDUINO
+        ingresarNombre = true; // Iniciar el ingreso del nombre
+        
+      }
+    }
+    else {
     // Si el juego está en ejecución
     if (mouseOverBoton(botonPausaX, botonPausaY, botonPausaAncho, botonPausaAlto)) {
       enPausa = true; // Pausar el juego
       miPuerto.write("PAUSA\n"); // Señal para pausar en Arduino
+      
     }
   }
 }
